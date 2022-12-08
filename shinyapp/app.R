@@ -1267,10 +1267,11 @@ server <- function(input, output, session) {
     req(input$data_sensor, isolate(flood_status_reactive()))
     input$refresh_button
     
-    if(!isolate(flood_status_reactive())$is_current){
-      return(datetime_to_timestamp(sensor_locations %>% filter(sensor_ID == input$data_sensor) %>% pull(date)))
-    }
-    else(return(NULL))
+    # if(!isolate(flood_status_reactive())$is_current){
+    #   return(datetime_to_timestamp(sensor_locations %>% filter(sensor_ID == input$data_sensor) %>% pull(date)))
+    # }
+    # else(return(NULL))
+    return(NULL)
   })
   
   observeEvent(input$data_sensor, {
