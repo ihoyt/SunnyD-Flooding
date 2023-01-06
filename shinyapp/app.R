@@ -1191,14 +1191,14 @@ server <- function(input, output, session) {
     
     if(input$map_layers == 2){
       leafletProxy(mapId = "m") %>% 
-        clearGroup("sensor_site") %>% 
-        addAwesomeMarkers(data = camera_locations, icon=map_icon, group = "camera_site",
-                          label = lapply(camera_locations_labels,HTML),
-                          labelOptions = labelOptions(direction = "top", style=list("border-radius" = "10px")),
-                          # clusterOptions = markerClusterOptions(),
-                          # clusterId = "place",
-                          layerId = camera_locations$camera_ID,
-        )
+        clearGroup("sensor_site") #%>% 
+        # addAwesomeMarkers(data = camera_locations, icon=map_icon, group = "camera_site",
+        #                   label = lapply(camera_locations_labels,HTML),
+        #                   labelOptions = labelOptions(direction = "top", style=list("border-radius" = "10px")),
+        #                   # clusterOptions = markerClusterOptions(),
+        #                   # clusterId = "place",
+        #                   layerId = camera_locations$camera_ID,
+        # )
       
     }
   })
