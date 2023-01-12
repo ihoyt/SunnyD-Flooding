@@ -30,7 +30,7 @@ library(tidyverse)
 
 
 # Source env variables if working on desktop
-# source("/Users/adam/Documents/SunnyD/sunnyday_postgres_keys.R")
+# source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R")
 
 # HTML waiting screen for initial load
 waiting_screen <- tagList(
@@ -67,6 +67,21 @@ data_for_display <- con %>%
 
 sensor_surveys <- con %>% 
   tbl("sensor_surveys")
+
+local_water_levels <- con %>% 
+  tbl("external_api_data") %>%
+  filter(type == "water_level") %>%
+  # select(id, date, value) %>%
+  # collect() 
+
+    # wl <- wl %>% transmute(
+    #     id = id,
+    #     date = date,
+    #     level = value,
+    #     entity = "FIMAN",
+    #     notes = "observation"
+    # ) 
+print(local_water_levels [0])
 
 fiman_gauge_key <- read_csv("fiman_gauge_key.csv")
 
@@ -122,45 +137,58 @@ noaa_wl <- function(id, type, begin_date, end_date){
   }
 
 fiman_wl <- function(id, begin_date, end_date){
-  station_keys <- fiman_gauge_key %>% 
-    filter(site_id == id) %>% 
-    filter(Sensor == "Water Elevation")
+  # station_keys <- fiman_gauge_key %>% 
+  #   filter(site_id == id) %>% 
+  #   filter(Sensor == "Water Elevation")
   
-  request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
-                       query = list(
-                         "site_id" = station_keys$site_id,
-                         "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
-                         "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
-                         "format_datetime"="%Y-%m-%d %H:%M:%S",
-                         "tz" = "UTC",
-                         "show_raw" = T,
-                         "show_quality" = T,
-                         "sensor_id" =  station_keys$sensor_id
+  # request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
+  #                      query = list(
+  #                        "site_id" = station_keys$site_id,
+  #                        "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
+  #                        "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
+  #                        "format_datetime"="%Y-%m-%d %H:%M:%S",
+  #                        "tz" = "UTC",
+  #                        "show_raw" = T,
+  #                        "show_quality" = T,
+  #                        "sensor_id" =  station_keys$sensor_id
                          
-                       ))
+  #                      ))
   
-  content <- request$content %>% 
-    xml2::read_xml() %>% 
-    xml2::as_list() %>% 
-    as_tibble()
+  # content <- request$content %>% 
+  #   xml2::read_xml() %>% 
+  #   xml2::as_list() %>% 
+  #   as_tibble()
   
-  parsed_content <- content$onerain$response %>% 
-    as_tibble() %>% 
-    unnest_wider("general") %>% 
-    unnest(cols = names(.)) %>% 
-    unnest(cols = names(.)) %>% 
-    mutate(data_time = lubridate::ymd_hms(data_time),
-           data_value = as.numeric(data_value))
+  # parsed_content <- content$onerain$response %>% 
+  #   as_tibble() %>% 
+  #   unnest_wider("general") %>% 
+  #   unnest(cols = names(.)) %>% 
+  #   unnest(cols = names(.)) %>% 
+  #   mutate(data_time = lubridate::ymd_hms(data_time),
+  #          data_value = as.numeric(data_value))
   
-  wl <- parsed_content %>%
-    transmute(
-      id = id,
-      date = data_time,
-      level = data_value,
-      entity = "FIMAN",
-      notes = "observation"
-    )
-  
+  # wl <- parsed_content %>%
+  #   transmute(
+  #     id = id,
+  #     date = data_time,
+  #     level = data_value,
+  #     entity = "FIMAN",
+  #     notes = "observation"
+  #   )
+
+    wl <- local_water_levels %>% 
+      filter(id == id, date >= start_date, data <= end_date) %>%
+      select(id, date, value)
+    # wl <- wl %>% transmute(
+    #     id = id,
+    #     date = date,
+    #     level = value,
+    #     entity = "FIMAN",
+    #     notes = "observation"
+    # ) 
+    for(i in wl) {
+      print(i)
+    }
   return(wl)
 }
 
@@ -561,7 +589,7 @@ ui <- bs4Dash::dashboardPage(
   ),
   footer = dashboardFooter(
     left = p(em(strong("Disclaimer: "), "Data are preliminary and for informational use only.")),
-    right = "Copyright 2022 Sunny Day Flooding"
+    right =  paste("Copyright", format(Sys.Date(), "%Y"), "Sunny Day Flooding", sep=" ")
   )
 )
 
@@ -1045,21 +1073,34 @@ server <- function(input, output, session) {
                              addProviderTiles(group = "Imagery",provider = providers$Esri.WorldImagery) %>%
                              addTiles(group = "OSM") %>%
                              setView(lng = -77.360784, lat = 34.576053, zoom = 8) %>%
-                             addCircleMarkers(data = sensor_locations %>% 
-                                                left_join(isolate(map_flood_status_reactive()), by = "sensor_ID"), group = "sensor_site",
-                                              # popup = ~html_popups,
-                                              label = lapply(sensor_locations_labels,HTML),
-                                              labelOptions = labelOptions(direction = "top", style=list("border-radius" = "10px")),
-                                              # clusterOptions = markerClusterOptions(),
-                                              # clusterId = "place",
-                                              layerId = sensor_locations$sensor_ID,
-                                              color = "black",
-                                              fillColor = sensor_locations %>%
-                                                left_join(isolate(map_flood_status_reactive()), by = "sensor_ID") %>%
-                                                left_join(tibble("flood_status" = c("UNKNOWN","FLOODING", "WARNING", "NOT FLOODING"),
-                                                                 "flood_color" = c("grey", "#dc3545", "#ffc107", "#28a745")), by = "flood_status") %>% 
-                                                pull(flood_color),
-                                              fillOpacity = 1) %>% 
+                            #  addCircleMarkers(data = sensor_locations %>% 
+                            #                     left_join(isolate(map_flood_status_reactive()), by = "sensor_ID"), group = "sensor_site",
+                            #                   # popup = ~html_popups,
+                            #                   label = lapply(sensor_locations_labels,HTML),
+                            #                   labelOptions = labelOptions(direction = "top", style=list("border-radius" = "10px")),
+                            #                   # clusterOptions = markerClusterOptions(),
+                            #                   # clusterId = "place",
+                            #                   layerId = sensor_locations$sensor_ID,
+                            #                   color = "black",
+                            #                   fillColor = sensor_locations %>%
+                            #                     left_join(isolate(map_flood_status_reactive()), by = "sensor_ID") %>%
+                            #                     left_join(tibble("flood_status" = c("UNKNOWN","FLOODING", "WARNING", "NOT FLOODING"),
+                            #                                      "flood_color" = c("grey", "#dc3545", "#ffc107", "#28a745")), by = "flood_status") %>% 
+                            #                     pull(flood_color),
+                            #                   fillOpacity = 1) %>% 
+                            addCircleMarkers(data = camera_locations,
+                                group = "camera_site",
+                                label = lapply(camera_locations_labels,HTML),
+                                labelOptions = labelOptions(direction = "top", style=list("border-radius" = "10px")),
+                                layerId = camera_locations$camera_ID,
+                                color = "black",
+                                fillColor = sensor_locations %>%
+                                  left_join(isolate(map_flood_status_reactive()), by = "sensor_ID") %>%
+                                  left_join(tibble("flood_status" = c("UNKNOWN","FLOODING", "WARNING", "NOT FLOODING"),
+                                                    "flood_color" = c("grey", "#dc3545", "#ffc107", "#28a745")), by = "flood_status") %>% 
+                                  pull(flood_color),
+                                fillOpacity = 1.0
+                            ) %>%
                              # leaflet::addLegend('bottomright', pal = pal_rev, values = c(-3.5,0.5),
                              #                    title = 'Water level<br>relative to<br>surface (ft)',
                              #                    opacity = 1,
@@ -1191,7 +1232,7 @@ server <- function(input, output, session) {
     
     if(input$map_layers == 2){
       leafletProxy(mapId = "m") %>% 
-        clearGroup("sensor_site") #%>% 
+        clearGroup("sensor_site") %>% 
         # addAwesomeMarkers(data = camera_locations, icon=map_icon, group = "camera_site",
         #                   label = lapply(camera_locations_labels,HTML),
         #                   labelOptions = labelOptions(direction = "top", style=list("border-radius" = "10px")),
@@ -1199,6 +1240,18 @@ server <- function(input, output, session) {
         #                   # clusterId = "place",
         #                   layerId = camera_locations$camera_ID,
         # )
+        addCircleMarkers(data = camera_locations,
+                           group = "camera_site",
+                         label = lapply(camera_locations_labels,HTML),
+                         labelOptions = labelOptions(direction = "top", style=list("border-radius" = "10px")),
+                         layerId = camera_locations$camera_ID,
+                         color = "black",
+                         fillColor = sensor_locations %>%
+                           left_join(isolate(map_flood_status_reactive()), by = "sensor_ID") %>%
+                           left_join(tibble("flood_status" = c("UNKNOWN","FLOODING", "WARNING", "NOT FLOODING"),
+                                            "flood_color" = c("grey", "#dc3545", "#ffc107", "#28a745")), by = "flood_status") %>% 
+                           pull(flood_color),
+                         fillOpacity = 1.0) 
       
     }
   })
