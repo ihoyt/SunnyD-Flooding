@@ -1072,7 +1072,7 @@ server <- function(input, output, session) {
                              addProviderTiles(group = "Dark Matter",provider = providers$CartoDB.DarkMatter) %>%
                              addProviderTiles(group = "Imagery",provider = providers$Esri.WorldImagery) %>%
                              addTiles(group = "OSM") %>%
-                             setView(lng = -77.360784, lat = 34.576053, zoom = 8) %>%
+                             setView(lng = -77.360784, lat = 34.576053, zoom = 9) %>%
                             #  addCircleMarkers(data = sensor_locations %>% 
                             #                     left_join(isolate(map_flood_status_reactive()), by = "sensor_ID"), group = "sensor_site",
                             #                   # popup = ~html_popups,
