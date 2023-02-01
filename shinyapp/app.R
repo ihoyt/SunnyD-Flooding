@@ -126,6 +126,11 @@ noaa_wl <- function(id, type, begin_date, end_date){
   }
 
 fiman_wl <- function(site_id, begin_date, end_date){
+  local_water_levels %>% 
+      filter(id == site_id, date >= begin_date, date <= end_date) %>%
+      select(id, date, value, api_name) %>%
+      arrange(date) %>% show_query()
+
   wl <- local_water_levels %>% 
       filter(id == site_id, date >= begin_date, date <= end_date) %>%
       select(id, date, value, api_name) %>%
