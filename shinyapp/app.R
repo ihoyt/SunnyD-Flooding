@@ -139,8 +139,6 @@ fiman_wl <- function(site_id, begin_date, end_date){
       ) %>%
       as_tibble()
 
-  print(wl)
-
   return(wl)
 }
 
