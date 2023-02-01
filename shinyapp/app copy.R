@@ -70,7 +70,18 @@ sensor_surveys <- con %>%
 
 local_water_levels <- con %>% 
   tbl("external_api_data") %>%
-  filter(type == "water_level")
+  filter(type == "water_level") %>%
+  # select(id, date, value) %>%
+  # collect() 
+
+    # wl <- wl %>% transmute(
+    #     id = id,
+    #     date = date,
+    #     level = value,
+    #     entity = "FIMAN",
+    #     notes = "observation"
+    # ) 
+print(local_water_levels [0])
 
 fiman_gauge_key <- read_csv("fiman_gauge_key.csv")
 
@@ -126,58 +137,59 @@ noaa_wl <- function(id, type, begin_date, end_date){
   }
 
 fiman_wl <- function(id, begin_date, end_date){
-  station_keys <- fiman_gauge_key %>% 
-    filter(site_id == id) %>% 
-    filter(Sensor == "Water Elevation")
+  # station_keys <- fiman_gauge_key %>% 
+  #   filter(site_id == id) %>% 
+  #   filter(Sensor == "Water Elevation")
   
-  request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
-                       query = list(
-                         "site_id" = station_keys$site_id,
-                         "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
-                         "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
-                         "format_datetime"="%Y-%m-%d %H:%M:%S",
-                         "tz" = "UTC",
-                         "show_raw" = T,
-                         "show_quality" = T,
-                         "sensor_id" =  station_keys$sensor_id
+  # request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
+  #                      query = list(
+  #                        "site_id" = station_keys$site_id,
+  #                        "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
+  #                        "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
+  #                        "format_datetime"="%Y-%m-%d %H:%M:%S",
+  #                        "tz" = "UTC",
+  #                        "show_raw" = T,
+  #                        "show_quality" = T,
+  #                        "sensor_id" =  station_keys$sensor_id
                          
-                       ))
+  #                      ))
   
-  content <- request$content %>% 
-    xml2::read_xml() %>% 
-    xml2::as_list() %>% 
-    as_tibble()
+  # content <- request$content %>% 
+  #   xml2::read_xml() %>% 
+  #   xml2::as_list() %>% 
+  #   as_tibble()
   
-  parsed_content <- content$onerain$response %>% 
-    as_tibble() %>% 
-    unnest_wider("general") %>% 
-    unnest(cols = names(.)) %>% 
-    unnest(cols = names(.)) %>% 
-    mutate(data_time = lubridate::ymd_hms(data_time),
-           data_value = as.numeric(data_value))
+  # parsed_content <- content$onerain$response %>% 
+  #   as_tibble() %>% 
+  #   unnest_wider("general") %>% 
+  #   unnest(cols = names(.)) %>% 
+  #   unnest(cols = names(.)) %>% 
+  #   mutate(data_time = lubridate::ymd_hms(data_time),
+  #          data_value = as.numeric(data_value))
   
-  wl <- parsed_content %>%
-    transmute(
-      id = id,
-      date = data_time,
-      level = data_value,
-      entity = "FIMAN",
-      notes = "observation"
-    )
+  # wl <- parsed_content %>%
+  #   transmute(
+  #     id = id,
+  #     date = data_time,
+  #     level = data_value,
+  #     entity = "FIMAN",
+  #     notes = "observation"
+  #   )
 
-  # wl <- local_water_levels %>% 
-  #     filter(id == id, date >= begin_date, date <= end_date) %>%
-  #     select(id, date, value, api_name) %>%
-  #     transmute(
-  #       id = id,
-  #       date = date,
-  #       level = value,
-  #       entity = api_name,
-  #       notes = "observation"
-  #     )
-
-  print(wl)
-  
+    print("DATABASE")
+    wl <- local_water_levels %>% 
+      filter(id == id, date >= start_date, data <= end_date) %>%
+      select(id, date, value)
+    # wl <- wl %>% transmute(
+    #     id = id,
+    #     date = date,
+    #     level = value,
+    #     entity = "FIMAN",
+    #     notes = "observation"
+    # ) 
+    for(i in wl) {
+      print(i)
+    }
   return(wl)
 }
 
@@ -216,6 +228,14 @@ jsCode <- "shinyjs.init = function() {
 });
 }"
 
+get_sensor_label <- function(sensor_ID) {
+    if (sensor_ID == 'CB_01') {
+      return('Carolina Beach 1')
+    } else (
+      return(sensor_ID)
+    )
+}
+
 
 #------------------------ Define UI ---------------------------------------
 ui <- bs4Dash::dashboardPage(
@@ -237,7 +257,7 @@ ui <- bs4Dash::dashboardPage(
       menuItem("Data", tabName = "Data", icon = icon("database")),
       menuItem("Flood Cam", tabName = "Pictures", icon = icon("camera")),
       a(HTML('<li class="nav-item">
-    <a class="nav-link" href="https://tarheels.live/sunny/" target="_blank">
+    <a class="nav-link" href="https://tarheels.live/sunnydayflood/" target="_blank">
       <i class="fas fa-external-link-alt nav-icon" role="presentation" aria-label="external-link-alt icon"></i>
       <p>Website
       <span class="right badge badge-success">Link</span></p>
@@ -547,38 +567,37 @@ ui <- bs4Dash::dashboardPage(
                 # tabBox(
                 #   collapsible = F,
                 #   type = "tabs",
-                #   tabPanel(
-                #     "Pictures",
-                #     imageOutput(outputId = "camera"),
-                #     uiOutput("firstCameraSelection", align = "center"),
-                #     uiOutput("secondCameraSelection", align = "center")
-                #   ),
-                #   # column(6,
-                #   #        h1("Water detected?",tippy(icon("info-circle",style="font-size:16px"), tooltip = div(h5("We are using machine learning to detect water on the road surface using our flood cams.",br(),br(),"The model used here is trained to distinguish pictures that have water in them from those that do not. Cars, salt water stains, sun glare, and other features in the photos can decrease the accuracy of the model.",br(),br(),"This model is still in development and is for informational purposes only."), style = "text-align:left"))),
-                #   #        div(p("In Development",style="color:white;text-align: center"),style="background-color:#fbb040;width:125px;border-radius: 20px"),
-                #   #        # p("The chart below shows the probability that water has been detected in this picture with our machine learning model"),
-                #   #         uiOutput(outputId = "camml")))
-                #   #        # highchartOutput(outputId ="tf_predict")))
-                #   # ),
-                #   tabPanel(
-                #     "Site Info",
-                #     h3("Site description coming soon"),
-                #     actionButton("view_on_map_camera", label = "View site on map", icon = icon("map"))
+                  # tabPanel(
+                    # "Pictures",
                     
-                #   )
+                  # ),
+                  fluidRow(
+                  column(width = 6,
+                         div(class="card",
+                             div(class = "card-body",
+                                imageOutput(outputId = "camera"),
+                                uiOutput("firstCameraSelection", align = "center"),
+                                uiOutput("secondCameraSelection", align = "center")
+                             )
+                         )
+                  ),
+                )
+                  # column(6,
+                  #        h1("Water detected?",tippy(icon("info-circle",style="font-size:16px"), tooltip = div(h5("We are using machine learning to detect water on the road surface using our flood cams.",br(),br(),"The model used here is trained to distinguish pictures that have water in them from those that do not. Cars, salt water stains, sun glare, and other features in the photos can decrease the accuracy of the model.",br(),br(),"This model is still in development and is for informational purposes only."), style = "text-align:left"))),
+                  #        div(p("In Development",style="color:white;text-align: center"),style="background-color:#fbb040;width:125px;border-radius: 20px"),
+                  #        # p("The chart below shows the probability that water has been detected in this picture with our machine learning model"),
+                  #         uiOutput(outputId = "camml")))
+                  #        # highchartOutput(outputId ="tf_predict")))
+                  # ),
+                  # tabPanel(
+                  #   "Site Info",
+                  #   h3("Site description coming soon"),
+                  #   actionButton("view_on_map_camera", label = "View site on map", icon = icon("map"))
+                    
+                  # )
                   
                 # )
-                fluidRow(
-                    column(width = 6,
-                          div(class="card",
-                              div(class = "card-body",
-                                  imageOutput(outputId = "camera"),
-                                  uiOutput("firstCameraSelection", align = "center"),
-                                  uiOutput("secondCameraSelection", align = "center")
-                              )
-                          )
-                    ),
-                )
+                
         ),
         tabItem(tabName = "Sensors",
                 uiOutput("dashboard_panels")
@@ -634,15 +653,15 @@ server <- function(input, output, session) {
   )
   
   # Popup on load to display info
-  # shinyalert(text = includeMarkdown("landing_text.md"),
-  #            html = T,
-  #            closeOnClickOutside = FALSE,
-  #            showConfirmButton = T,
-  #            confirmButtonCol = "#fbb040",
-  #            confirmButtonText = "OK",
-  #            type = "info",
-  #            animation=F,
-  #            size = "s")
+  shinyalert(text = includeMarkdown("landing_text.md"),
+             html = T,
+             closeOnClickOutside = FALSE,
+             showConfirmButton = T,
+             confirmButtonCol = "#fbb040",
+             confirmButtonText = "OK",
+             type = "info",
+             animation=F,
+             size = "s")
   
   
   output$leaf = renderUI({
@@ -793,12 +812,12 @@ server <- function(input, output, session) {
     mutate(
       html_popups = paste0( 
         '<div>',
-        '<h4 align="center"><strong>Site ',sensor_ID,'</h4></strong>',
+        '<h4 align="center"><strong>Site ',get_sensor_label(sensor_ID),'</h4></strong>',
         '<h5 align="center">Last level:</h5>',
         '<h4 align="center">',round(road_water_level_adj, digits = 2),'</h4>',
         '<p align="center">',paste0(format(date_lst, "%I:%M %p", usetz = T)," - ",format(date_lst, "%b %d, %Y")),'</p>',
         '<p align="center">Click to view data at this site</p>'
-      )
+      ),
     )
   
   camera_locations <- con %>% 
@@ -924,7 +943,13 @@ server <- function(input, output, session) {
   })
   
   output$secondCameraSelection <- renderUI({
-    selectInput("camera_ID", "Camera", choices = reactive_selection$overall_camera_choices, selected = reactive_selection$overall_camera_ID, selectize = F,multiple = F)
+    if (grepl("CB", reactive_selection$overall_camera_ID, fixed=TRUE)) {
+      cam_choices = append(reactive_selection$overall_camera_choices, "Show All", after=0)
+    } else {
+      cam_choices = reactive_selection$overall_camera_choices
+      print(reactive_selection$overall_camera_ID)
+    }
+    selectInput("camera_ID", "Camera", choices = cam_choices, selected = reactive_selection$overall_camera_ID, selectize = F,multiple = F)
   })
   
   map_flood_status_reactive <- reactive({
@@ -1252,7 +1277,6 @@ server <- function(input, output, session) {
                            pull(flood_color),
                          fillOpacity = 1.0
         ) 
-      
     }
   })
   
@@ -1330,7 +1354,7 @@ server <- function(input, output, session) {
     
     updateMaterialSwitch(session, 
                       inputId = "view_3rdparty_data",
-                      value = F)
+                      value = T)
     
     if(is.na(isolate(local_wl_metadata()$wl_url))){
       shinyjs::disable(id = "view_3rdparty_data")
