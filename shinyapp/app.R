@@ -126,23 +126,57 @@ noaa_wl <- function(id, type, begin_date, end_date){
   }
 
 fiman_wl <- function(site_id, begin_date, end_date){
-  local_water_levels %>% 
-      filter(id == site_id, date >= begin_date, date <= end_date) %>%
-      select(id, date, value, api_name) %>%
-      arrange(date) %>% show_query()
+  station_keys <- fiman_gauge_key %>% 
+    filter(site_id == id) %>% 
+    filter(Sensor == "Water Elevation")
+  
+  request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
+                       query = list(
+                         "site_id" = station_keys$site_id,
+                         "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
+                         "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
+                         "format_datetime"="%Y-%m-%d %H:%M:%S",
+                         "tz" = "UTC",
+                         "show_raw" = T,
+                         "show_quality" = T,
+                         "sensor_id" =  station_keys$sensor_id
+                         
+                       ))
+  
+  content <- request$content %>% 
+    xml2::read_xml() %>% 
+    xml2::as_list() %>% 
+    as_tibble()
+  
+  parsed_content <- content$onerain$response %>% 
+    as_tibble() %>% 
+    unnest_wider("general") %>% 
+    unnest(cols = names(.)) %>% 
+    unnest(cols = names(.)) %>% 
+    mutate(data_time = lubridate::ymd_hms(data_time),
+           data_value = as.numeric(data_value))
+  
+  wl <- parsed_content %>%
+    transmute(
+      id = id,
+      date = data_time,
+      level = data_value,
+      entity = "FIMAN",
+      notes = "observation"
+    )
 
-  wl <- local_water_levels %>% 
-      filter(id == site_id, date >= begin_date, date <= end_date) %>%
-      select(id, date, value, api_name) %>%
-      arrange(date) %>%
-      transmute(
-        id = id,
-        date = date,
-        level = value,
-        entity = api_name,
-        notes = "observation"
-      ) %>%
-      as_tibble()
+  # wl <- local_water_levels %>% 
+  #     filter(id == site_id, date >= begin_date, date <= end_date) %>%
+  #     select(id, date, value, api_name) %>%
+  #     arrange(date) %>%
+  #     transmute(
+  #       id = id,
+  #       date = date,
+  #       level = value,
+  #       entity = api_name,
+  #       notes = "observation"
+  #     ) %>%
+  #     as_tibble()
 
   return(wl)
 }
