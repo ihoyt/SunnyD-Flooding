@@ -30,7 +30,7 @@ library(tidyverse)
 
 
 # Source env variables if working on desktop
-source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R")
+# source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R")
 
 # HTML waiting screen for initial load
 waiting_screen <- tagList(
