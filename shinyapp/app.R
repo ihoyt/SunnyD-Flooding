@@ -30,7 +30,7 @@ library(tidyverse)
 
 
 # Source env variables if working on desktop
-# source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R")
+source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R")
 
 # HTML waiting screen for initial load
 waiting_screen <- tagList(
@@ -63,7 +63,7 @@ onStop(function() {
 })
 
 data_for_display <- con %>% 
-  tbl("data_for_display")
+  tbl("data_for_display") 
 
 sensor_surveys <- con %>% 
   tbl("sensor_surveys")
@@ -125,58 +125,58 @@ noaa_wl <- function(id, type, begin_date, end_date){
     return(wl)
   }
 
-fiman_wl <- function(id, begin_date, end_date){
-station_keys <- fiman_gauge_key %>% 
-    filter(site_id == id) %>% 
-    filter(Sensor == "Water Elevation")
+fiman_wl <- function(site_id, begin_date, end_date){
+# station_keys <- fiman_gauge_key %>% 
+#     filter(site_id == id) %>% 
+#     filter(Sensor == "Water Elevation")
   
-  request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
-                       query = list(
-                         "site_id" = station_keys$site_id,
-                         "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
-                         "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
-                         "format_datetime"="%Y-%m-%d %H:%M:%S",
-                         "tz" = "UTC",
-                         "show_raw" = T,
-                         "show_quality" = T,
-                         "sensor_id" =  station_keys$sensor_id
+#   request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
+#                        query = list(
+#                          "site_id" = station_keys$site_id,
+#                          "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
+#                          "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
+#                          "format_datetime"="%Y-%m-%d %H:%M:%S",
+#                          "tz" = "UTC",
+#                          "show_raw" = T,
+#                          "show_quality" = T,
+#                          "sensor_id" =  station_keys$sensor_id
                          
-                       ))
+#                        ))
   
-  content <- request$content %>% 
-    xml2::read_xml() %>% 
-    xml2::as_list() %>% 
-    as_tibble()
+#   content <- request$content %>% 
+#     xml2::read_xml() %>% 
+#     xml2::as_list() %>% 
+#     as_tibble()
   
-  parsed_content <- content$onerain$response %>% 
-    as_tibble() %>% 
-    unnest_wider("general") %>% 
-    unnest(cols = names(.)) %>% 
-    unnest(cols = names(.)) %>% 
-    mutate(data_time = lubridate::ymd_hms(data_time),
-           data_value = as.numeric(data_value))
+#   parsed_content <- content$onerain$response %>% 
+#     as_tibble() %>% 
+#     unnest_wider("general") %>% 
+#     unnest(cols = names(.)) %>% 
+#     unnest(cols = names(.)) %>% 
+#     mutate(data_time = lubridate::ymd_hms(data_time),
+#            data_value = as.numeric(data_value))
   
-  wl <- parsed_content %>%
-    transmute(
-      id = id,
-      date = data_time,
-      level = data_value,
-      entity = "FIMAN",
-      notes = "observation"
-    )
+#   wl <- parsed_content %>%
+#     transmute(
+#       id = id,
+#       date = data_time,
+#       level = data_value,
+#       entity = "FIMAN",
+#       notes = "observation"
+#     )
 
-  # wl <- local_water_levels %>% 
-  #     filter(id == site_id, date >= begin_date, date <= end_date) %>%
-  #     select(id, date, value, api_name) %>%
-  #     arrange(date) %>%
-  #     transmute(
-  #       id = id,
-  #       date = date,
-  #       level = value,
-  #       entity = api_name,
-  #       notes = "observation"
-  #     ) %>%
-  #     as_tibble()
+  wl <- local_water_levels %>% 
+      filter(id == site_id, date >= begin_date, date <= end_date) %>%
+      select(id, date, value, api_name) %>%
+      arrange(date) %>%
+      transmute(
+        id = id,
+        date = date,
+        level = value,
+        entity = api_name,
+        notes = "observation"
+      ) %>%
+      as_tibble()
 
   return(wl)
 }
@@ -190,7 +190,7 @@ get_local_wl <- function(wl_id, wl_src, type = c("obs"), begin_date, end_date) {
                           type = type,
                           begin_date = begin_date,
                           end_date = end_date),
-         "FIMAN" = fiman_wl(id = wl_id,
+         "FIMAN" = fiman_wl(site_id = wl_id,
                             begin_date = begin_date,
                             end_date = end_date)
   )
@@ -498,19 +498,19 @@ ui <- bs4Dash::dashboardPage(
                          hr(),
                          h4("Plot options"),
                          fluidRow(
-                           column(width = 3,
+                           column(width = 4,
                                   uiOutput("firstSelection"),
                                   uiOutput("secondSelection")
                            ),
-                           column(width=1),
-                           column(width = 3,
+                          #  column(width=1),
+                           column(width = 4,
                                   selectInput(inputId = "elev_datum", label = "Elevation Datum", selectize = F,choices = c("Road","NAVD88"), selected = "Road"),
                                   p(strong("Local water levels"),tippy(icon("info-circle",style="font-size:14px"), h5("Click the button below to add nearby downstream water levels to the plot.",br(),br(),"Adding these data can help visualize when flooding may occur.",br(),br(),"Turning this option on may slow down the drawing of the plot.",style = "text-align:left;"))),
                                   materialSwitch(inputId = "view_3rdparty_data", label = ,value = F,inline=T, status = "success"),
                                   uiOutput(outputId="thirdparty_info", style="display:inline;")
                            ),
-                           column(width=1),
-                           column(width = 3,
+                          #  column(width=1),
+                           column(width = 4,
                                   uiOutput("dateRange"),
                                   br(),
                                   div(
@@ -634,15 +634,15 @@ server <- function(input, output, session) {
   )
   
   # Popup on load to display info
-  # shinyalert(text = includeMarkdown("landing_text.md"),
-  #            html = T,
-  #            closeOnClickOutside = FALSE,
-  #            showConfirmButton = T,
-  #            confirmButtonCol = "#fbb040",
-  #            confirmButtonText = "OK",
-  #            type = "info",
-  #            animation=F,
-  #            size = "s")
+  shinyalert(text = includeMarkdown("landing_text.md"),
+             html = T,
+             closeOnClickOutside = FALSE,
+             showConfirmButton = T,
+             confirmButtonCol = "#fbb040",
+             confirmButtonText = "OK",
+             type = "info",
+             animation=F,
+             size = "s")
   
   
   output$leaf = renderUI({
@@ -789,18 +789,31 @@ server <- function(input, output, session) {
                        road_water_level = road_water_level_adj) %>% 
     mutate(date_lst = lubridate::with_tz(date, tzone = "America/New_York")) %>% 
     filter(!is.na(lat) & !is.na(lng)) %>% 
-    sf::st_as_sf(coords = c("lng", "lat"), crs = 4269) %>%
+    sf::st_as_sf(coords = c("lng", "lat"), crs = 4269)
+
+  sensor_labels <- con %>% 
+                    tbl("sensor_surveys") %>% 
+                    select(sensor_ID, sensor_label) %>% 
+                    distinct(sensor_ID, .keep_all = TRUE) %>% 
+                    collect()
+    
+  sensor_locations <- merge(sensor_locations, sensor_labels, by = c("sensor_ID")) %>% 
+    mutate(
+      html_label = paste0(sensor_label, "<br> (", sensor_ID, ")"),
+      sensor_label = paste0(sensor_label, " (", sensor_ID, ")")
+    ) %>%
     mutate(
       html_popups = paste0( 
         '<div>',
-        '<h4 align="center"><strong>Site ',sensor_ID,'</h4></strong>',
+        '<h4 align="center"><strong>',html_label,'</strong></h4>',
         '<h5 align="center">Last level:</h5>',
         '<h4 align="center">',round(road_water_level_adj, digits = 2),'</h4>',
         '<p align="center">',paste0(format(date_lst, "%I:%M %p", usetz = T)," - ",format(date_lst, "%b %d, %Y")),'</p>',
-        '<p align="center">Click to view data at this site</p>'
-      )
+        '<p align="center">Click to view data at this site</p>',
+        '</div>'
+      ),
     )
-  
+
   camera_locations <- con %>% 
     tbl("camera_locations") %>%
     collect() %>% 
@@ -812,12 +825,17 @@ server <- function(input, output, session) {
     mutate(date_lst = lubridate::with_tz(DateTimeOriginalUTC , tzone = "America/New_York")) %>% 
     sf::st_as_sf(coords = c("lng", "lat"), crs = 4269) %>% 
     mutate(
+      html_label = paste0(camera_label, "<br> (", camera_ID, ")"),
+      camera_label = paste0(camera_label, " (", camera_ID, ")")
+    ) %>%
+    mutate(
       html_popups = paste0( 
         '<div>',
-        '<h4 align="center"><strong>Camera ',camera_ID,'</h4></strong>',
+        '<h4 align="center"><strong>',html_label,'</strong></h4>',
         '<h5 align="center">Last picture:</h5>',
         '<p align="center">',paste0(format(date_lst, "%I:%M %p", usetz = T)," - ",format(date_lst, "%b %d, %Y")),'</p>',
-        '<p align="center">Click to view this camera</p>'
+        '<p align="center">Click to view this camera</p>',
+        '</div>'
       )
     )
   
@@ -1258,12 +1276,16 @@ server <- function(input, output, session) {
   
   # Updates the choices for the sensor ID on the data tab
   observe({
-    reactive_selection$overall_data_sensor_choices <- sensor_locations$sensor_ID[sensor_locations$place == input$data_location]
+    ids <- sensor_locations$sensor_ID[sensor_locations$place == input$data_location]
+    choices = setNames(as.list(ids), sensor_locations$sensor_label[sensor_locations$place == input$data_location])
+    reactive_selection$overall_data_sensor_choices <- choices
   })
   
   # Updates the choices for the camera ID on the data tab
   observe({
-    reactive_selection$overall_camera_choices <- camera_locations$camera_ID[camera_locations$place == input$camera_location]
+    ids <- camera_locations$camera_ID[camera_locations$place == input$camera_location]
+    choices = setNames(as.list(ids), camera_locations$camera_label[camera_locations$place == input$camera_location])
+    reactive_selection$overall_camera_choices <- choices
   })
   
 
@@ -1327,19 +1349,26 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$data_sensor, {
-    
-    updateMaterialSwitch(session, 
-                      inputId = "view_3rdparty_data",
-                      value = F)
-    
-    if(is.na(isolate(local_wl_metadata()$wl_url))){
-      shinyjs::disable(id = "view_3rdparty_data")
+    # Always show third party data for CB/FIMAN locations
+    if(grepl( 'CB_', input$data_sensor, fixed = TRUE)) {
+      updateMaterialSwitch(session, 
+                            inputId = "view_3rdparty_data",
+                            value = T)
+      shinyjs::hide(id = "view_3rdparty_data")
+    } else {
+      updateMaterialSwitch(session, 
+                            inputId = "view_3rdparty_data",
+                            value = F)
+
+      shinyjs::show(id = "view_3rdparty_data")
+      if(is.na(isolate(local_wl_metadata()$wl_url))){
+        shinyjs::disable(id = "view_3rdparty_data")
+      }
+      
+      if(!is.na(isolate(local_wl_metadata()$wl_url))){
+        shinyjs::enable(id = "view_3rdparty_data")
+      }
     }
-    
-    if(!is.na(isolate(local_wl_metadata()$wl_url))){
-      shinyjs::enable(id = "view_3rdparty_data")
-    }
-    
   })
   
   
@@ -1570,7 +1599,7 @@ server <- function(input, output, session) {
                      buttons = list(contextButton = list(symbolSize = 20,
                                                          x= -20,
                                                          menuItems = list("viewFullscreen", "printChart", "separator", "downloadPNG")))) %>%
-        hc_title(text =plot_sensor_stats$sensor_ID,
+        hc_title(text =plot_sensor_stats$sensor_label,
                  floating = F)
       
       if(input$view_3rdparty_data == T){
