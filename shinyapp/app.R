@@ -125,7 +125,7 @@ noaa_wl <- function(id, type, begin_date, end_date){
     return(wl)
   }
 
-fiman_wl <- function(site_id, begin_date, end_date){
+fiman_wl <- function(id, begin_date, end_date){
 station_keys <- fiman_gauge_key %>% 
     filter(site_id == id) %>% 
     filter(Sensor == "Water Elevation")
