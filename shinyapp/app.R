@@ -190,7 +190,7 @@ get_local_wl <- function(wl_id, wl_src, type = c("obs"), begin_date, end_date) {
                           type = type,
                           begin_date = begin_date,
                           end_date = end_date),
-         "FIMAN" = fiman_wl(site_id = wl_id,
+         "FIMAN" = fiman_wl(id = wl_id,
                             begin_date = begin_date,
                             end_date = end_date)
   )
