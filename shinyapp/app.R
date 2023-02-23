@@ -30,7 +30,7 @@ library(tidyverse)
 
 
 # Source env variables if working on desktop
-# source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R")
+source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R") 
 
 # HTML waiting screen for initial load
 waiting_screen <- tagList(
@@ -125,58 +125,58 @@ noaa_wl <- function(id, type, begin_date, end_date){
     return(wl)
   }
 
-fiman_wl <- function(id, begin_date, end_date){
-station_keys <- fiman_gauge_key %>% 
-    filter(site_id == id) %>% 
-    filter(Sensor == "Water Elevation")
+fiman_wl <- function(site_id, begin_date, end_date){
+# station_keys <- fiman_gauge_key %>% 
+#     filter(site_id == id) %>% 
+#     filter(Sensor == "Water Elevation")
   
-  request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
-                       query = list(
-                         "site_id" = station_keys$site_id,
-                         "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
-                         "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
-                         "format_datetime"="%Y-%m-%d %H:%M:%S",
-                         "tz" = "UTC",
-                         "show_raw" = T,
-                         "show_quality" = T,
-                         "sensor_id" =  station_keys$sensor_id
+#   request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
+#                        query = list(
+#                          "site_id" = station_keys$site_id,
+#                          "data_start" = paste0(format(begin_date, "%Y-%m-%d %H:%M:%S")),
+#                          "date_end" = paste0(format(end_date, "%Y-%m-%d %H:%M:%S")),
+#                          "format_datetime"="%Y-%m-%d %H:%M:%S",
+#                          "tz" = "UTC",
+#                          "show_raw" = T,
+#                          "show_quality" = T,
+#                          "sensor_id" =  station_keys$sensor_id
                          
-                       ))
+#                        ))
   
-  content <- request$content %>% 
-    xml2::read_xml() %>% 
-    xml2::as_list() %>% 
-    as_tibble()
+#   content <- request$content %>% 
+#     xml2::read_xml() %>% 
+#     xml2::as_list() %>% 
+#     as_tibble()
   
-  parsed_content <- content$onerain$response %>% 
-    as_tibble() %>% 
-    unnest_wider("general") %>% 
-    unnest(cols = names(.)) %>% 
-    unnest(cols = names(.)) %>% 
-    mutate(data_time = lubridate::ymd_hms(data_time),
-           data_value = as.numeric(data_value))
+#   parsed_content <- content$onerain$response %>% 
+#     as_tibble() %>% 
+#     unnest_wider("general") %>% 
+#     unnest(cols = names(.)) %>% 
+#     unnest(cols = names(.)) %>% 
+#     mutate(data_time = lubridate::ymd_hms(data_time),
+#            data_value = as.numeric(data_value))
   
-  wl <- parsed_content %>%
-    transmute(
-      id = id,
-      date = data_time,
-      level = data_value,
-      entity = "FIMAN",
-      notes = "observation"
-    )
+#   wl <- parsed_content %>%
+#     transmute(
+#       id = id,
+#       date = data_time,
+#       level = data_value,
+#       entity = "FIMAN",
+#       notes = "observation"
+#     )
 
-  # wl <- local_water_levels %>% 
-  #     filter(id == site_id, date >= begin_date, date <= end_date) %>%
-  #     select(id, date, value, api_name) %>%
-  #     arrange(date) %>%
-  #     transmute(
-  #       id = id,
-  #       date = date,
-  #       level = value,
-  #       entity = api_name,
-  #       notes = "observation"
-  #     ) %>%
-  #     as_tibble()
+  wl <- local_water_levels %>% 
+      filter(id == site_id, date >= begin_date, date <= end_date) %>%
+      select(id, date, value, api_name) %>%
+      arrange(date) %>%
+      transmute(
+        id = id,
+        date = date,
+        level = value,
+        entity = api_name,
+        notes = "observation"
+      ) %>%
+      as_tibble()
 
   return(wl)
 }
@@ -190,7 +190,7 @@ get_local_wl <- function(wl_id, wl_src, type = c("obs"), begin_date, end_date) {
                           type = type,
                           begin_date = begin_date,
                           end_date = end_date),
-         "FIMAN" = fiman_wl(id = wl_id,
+         "FIMAN" = fiman_wl(site_id = wl_id,
                             begin_date = begin_date,
                             end_date = end_date)
   )
@@ -1372,7 +1372,7 @@ server <- function(input, output, session) {
   })
   
   
-  observeEvent(c(input$get_plot_data, input$view_3rdparty_data),{
+  observeEvent(c(input$get_plot_data, input$view_3rdparty_data, input$data_sensor),{
     req(input$view_3rdparty_data == T,
         "obs" %in% unlist(isolate(local_wl_metadata())$types),
         abs(input$dateRange[2] - input$dateRange[1]) <=30,
@@ -1395,7 +1395,6 @@ server <- function(input, output, session) {
              road_water_level= level-plot_sensor_stats$road_elevation,
              sensor_water_level=level)
     w$hide()
-    
   })
   
   observeEvent(c(input$get_plot_data, input$view_3rdparty_data),{
@@ -1418,7 +1417,6 @@ server <- function(input, output, session) {
       mutate(date = datetime_to_timestamp(date),
              road_water_level= level-plot_sensor_stats$road_elevation,
              sensor_water_level=level)
-    
   })
   
   site_info <- reactive({
@@ -1606,7 +1604,7 @@ server <- function(input, output, session) {
         
         plot_3rd_party_data_stats <- local_wl_metadata()
         
-        if("obs" %in% unlist(plot_3rd_party_data_stats$types)){
+        if("obs" %in% unlist(plot_3rd_party_data_stats$types)) {
           hc <- hc %>% hc_add_series(plot_3rd_party_data_obs %>% dplyr::select(date,"wl" = ifelse(input$elev_datum == "Road","road_water_level","sensor_water_level")),
                                      hcaes(x=date,
                                            y=wl),
