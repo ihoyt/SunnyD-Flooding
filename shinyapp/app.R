@@ -167,7 +167,7 @@ fiman_wl <- function(id, begin_date, end_date){
       notes = "observation"
     )
 
-  print(wl)
+  print(wl, n=40)
 
   # wl <- local_water_levels %>% 
   #     filter(id == site_id, date >= begin_date, date <= end_date) %>%
