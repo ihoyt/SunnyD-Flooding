@@ -125,9 +125,9 @@ noaa_wl <- function(id, type, begin_date, end_date){
     return(wl)
   }
 
-fiman_wl <- function(site_id, begin_date, end_date){
+fiman_wl <- function(id, begin_date, end_date){
 station_keys <- fiman_gauge_key %>% 
-    filter(id == site_id) %>% 
+    filter(id == id) %>% 
     filter(Sensor == "Water Elevation")
   
   request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
@@ -192,7 +192,7 @@ get_local_wl <- function(wl_id, wl_src, type = c("obs"), begin_date, end_date) {
                           type = type,
                           begin_date = begin_date,
                           end_date = end_date),
-         "FIMAN" = fiman_wl(site_id = wl_id,
+         "FIMAN" = fiman_wl(id = wl_id,
                             begin_date = begin_date,
                             end_date = end_date)
   )
