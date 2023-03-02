@@ -128,7 +128,7 @@ noaa_wl <- function(id, type, begin_date, end_date){
 fiman_wl <- function(id, begin_date, end_date){
   print("fiman_wl entered")
   station_keys <- fiman_gauge_key %>% 
-    filter(id == id) %>% 
+    filter(site_id == id) %>% 
     filter(Sensor == "Water Elevation")
   
   request <- httr::GET(url = Sys.getenv("FIMAN_URL"),
