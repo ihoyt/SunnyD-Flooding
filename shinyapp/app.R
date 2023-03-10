@@ -939,7 +939,7 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       downloadData = sensor_data() %>% 
-        select(date, sensor_elevation, road_elevation, sensor_water_level, road_water_level) %>%
+        select(date, sensor_elevation, road_elevation, sensor_water_level_adj, road_water_level_adj) %>%
         arrange(date) %>%
         mutate(
           date = format(date, '%m/%d/%Y %H:%M')
