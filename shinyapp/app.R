@@ -126,7 +126,6 @@ noaa_wl <- function(id, type, begin_date, end_date){
   }
 
 fiman_wl <- function(site_id, begin_date, end_date){
-  # print("fiman_wl entered")
   # station_keys <- fiman_gauge_key %>% 
   #   filter(site_id == id) %>% 
   #   filter(Sensor == "Water Elevation")
@@ -149,7 +148,6 @@ fiman_wl <- function(site_id, begin_date, end_date){
   #   xml2::as_list() %>% 
   #   as_tibble()
   
-  # print("FIMAN response received")
   # parsed_content <- content$onerain$response %>% 
   #   as_tibble() %>% 
   #   unnest_wider("general") %>% 
@@ -165,9 +163,7 @@ fiman_wl <- function(site_id, begin_date, end_date){
   #     level = data_value,
   #     entity = "FIMAN",
   #     notes = "observation"
-    )
-
-  # print(wl, n=1000)
+    # )
 
   wl <- local_water_levels %>% 
       filter(id == site_id, date >= begin_date, date <= end_date) %>%
@@ -181,8 +177,6 @@ fiman_wl <- function(site_id, begin_date, end_date){
         notes = "observation"
       ) %>%
       as_tibble()
-
-  print(wl, n=200)
 
   return(wl)
 }
