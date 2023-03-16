@@ -69,7 +69,7 @@ sensor_surveys <- con %>%
   tbl("sensor_surveys")
 
 local_water_levels <- con %>% 
-  tbl("external_api_data") %>%
+  tbl("api_data") %>%
   filter(type == "water_level")
 
 fiman_gauge_key <- read_csv("fiman_gauge_key.csv")
