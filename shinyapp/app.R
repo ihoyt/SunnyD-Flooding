@@ -69,7 +69,7 @@ sensor_surveys <- con %>%
   tbl("sensor_surveys")
 
 local_water_levels <- con %>% 
-  tbl("api_data") %>%
+  tbl("external_api_data") %>%
   filter(type == "water_level")
 
 fiman_gauge_key <- read_csv("fiman_gauge_key.csv")
@@ -514,8 +514,11 @@ ui <- bs4Dash::dashboardPage(
                            column(width = 4,
                                   selectInput(inputId = "elev_datum", label = "Elevation Datum", selectize = F,choices = c("Road","NAVD88"), selected = "Road"),
                                   p(strong("Local water levels"),tippy(icon("info-circle",style="font-size:14px"), h5("Click the button below to add nearby downstream water levels to the plot.",br(),br(),"Adding these data can help visualize when flooding may occur.",br(),br(),"Turning this option on may slow down the drawing of the plot.",style = "text-align:left;"))),
-                                  materialSwitch(inputId = "view_3rdparty_data", label = ,value = F,inline=T, status = "success"),
-                                  uiOutput(outputId="thirdparty_info", style="display:inline;")
+                                  materialSwitch(inputId = "view_3rdparty_data", label = ,value = F,inline=T, status = "success",),
+                                  uiOutput(outputId="thirdparty_info", style="display:inline;"),
+                                  br(),
+                                  materialSwitch(inputId = "view_alt_3rdparty_data", label = ,value = F,inline=T, status = "success"),
+                                  uiOutput(outputId="alt_thirdparty_info", style="display:inline;")
                            ),
                           #  column(width=1),
                            column(width = 4,
@@ -670,6 +673,8 @@ server <- function(input, output, session) {
     }
     
   })
+
+  shinyjs::hide(id = "view_alt_3rdparty_data")
   
   observeEvent(input$nav,
                {
@@ -936,14 +941,16 @@ server <- function(input, output, session) {
         select(date, sensor_elevation, road_elevation, sensor_water_level_adj, road_water_level_adj) %>%
         arrange(date) %>%
         mutate(
-          date = format(date, '%m/%d/%Y %H:%M')
+          date = format(date, '%m/%d/%Y %H:%M'),
+          sensor_elevation = round(sensor_elevation, digits=2),
+          road_elevation = round(road_elevation, digits=2),
+          sensor_water_level_adj = round(sensor_water_level_adj, digits=2),
+          road_water_level_adj = round(road_water_level_adj, digits=2),
         )
 
-      # write.csv(sensor_data() |> arrange(date), file)
       headers <- c('timestamp (UTC)','sensor elev. (ft NAVD88)','road elev. (ft NAVD88)','water level (ft NAVD88)','water level (ft above or below road elev.)')
       colnames(downloadData) <- headers
       write_csv(downloadData, file)
-      # write.csv(downloadData, file, row.names=FALSE)
     } 
   )
   
@@ -1345,6 +1352,19 @@ server <- function(input, output, session) {
       mutate(types = str_split(wl_types, pattern = ", "),
              url = wl_url)
   })
+
+  alt_local_wl_metadata <- reactive({
+    req(input$data_sensor)
+    
+    input$data_sensor
+
+    sensor_surveys %>% 
+      filter(sensor_ID == !!input$data_sensor) %>%
+      filter(date_surveyed == max(date_surveyed, na.rm=T)) %>% 
+      collect() %>% 
+      mutate(types = str_split(alt_wl_types, pattern = ", "),
+             url = alt_wl_url)
+  })
   
   output$thirdparty_info <- renderUI({
     wl_metadata_collected <- local_wl_metadata()
@@ -1353,6 +1373,16 @@ server <- function(input, output, session) {
     }
     
     else(helpText("  Not available"))
+
+  })
+
+  output$alt_thirdparty_info <- renderUI({
+    alt_wl_metadata_collected <- alt_local_wl_metadata()
+    if(!is.na(alt_wl_metadata_collected$alt_wl_url)){
+      helpText("  Data source: ",a(href=alt_wl_metadata_collected$alt_wl_url,alt_wl_metadata_collected$alt_wl_src, target = "_blank", class = "pretty-link"))
+    }
+    
+    # else(helpText("  Not available"))
 
   })
   
@@ -1378,16 +1408,26 @@ server <- function(input, output, session) {
       updateMaterialSwitch(session, 
                             inputId = "view_3rdparty_data",
                             value = F)
-
-      shinyjs::show(id = "view_3rdparty_data")
-      if(is.na(isolate(local_wl_metadata()$wl_url))){
-        shinyjs::disable(id = "view_3rdparty_data")
-      }
-      
-      if(!is.na(isolate(local_wl_metadata()$wl_url))){
-        shinyjs::enable(id = "view_3rdparty_data")
-      }
     }
+    shinyjs::show(id = "view_3rdparty_data")
+    if(is.na(isolate(local_wl_metadata()$wl_url))){
+      shinyjs::disable(id = "view_3rdparty_data")
+    }
+    
+    if(!is.na(isolate(local_wl_metadata()$wl_url))){
+      shinyjs::enable(id = "view_3rdparty_data")
+    }
+
+    if(is.na(isolate(alt_local_wl_metadata()$alt_wl_url))){
+      shinyjs::hide(id = "view_alt_3rdparty_data")
+      shinyjs::disable(id = "view_alt_3rdparty_data")
+    }
+    
+    if(!is.na(isolate(alt_local_wl_metadata()$alt_wl_url))){
+      shinyjs::show(id = "view_alt_3rdparty_data")
+      shinyjs::enable(id = "view_alt_3rdparty_data")
+    }
+    # }
   })
   
   
@@ -1430,6 +1470,53 @@ server <- function(input, output, session) {
     
     plot_3rd_party_data_predict <<- get_local_wl(wl_id = isolate(local_wl_metadata())$wl_id,
                                                  wl_src = isolate(local_wl_metadata())$wl_src,
+                                                 type = "pred",
+                                                 begin_date = min_date %>% str_remove_all("-"),
+                                                 end_date = max_date %>% str_remove_all("-")) %>% 
+      mutate(date = datetime_to_timestamp(date),
+             road_water_level= level-plot_sensor_stats$road_elevation,
+             sensor_water_level=level)
+  })
+
+   observeEvent(c(input$get_plot_data, input$view_alt_3rdparty_data, input$data_sensor),{
+    req(input$view_alt_3rdparty_data == T,
+        "obs" %in% unlist(isolate(alt_local_wl_metadata())$types),
+        abs(input$dateRange[2] - input$dateRange[1]) <=30,
+        nrow(sensor_data()!=0))
+    
+    w$show()
+    
+    min_date = min(input$dateRange)
+    max_date = max(input$dateRange)
+    
+    plot_sensor_stats <- sensor_locations %>%
+      filter(sensor_ID %in% input$data_sensor)
+    
+    plot_alt_3rd_party_data_obs <<- get_local_wl(wl_id = isolate(alt_local_wl_metadata())$alt_wl_id,
+                                             wl_src = isolate(alt_local_wl_metadata())$alt_wl_src,
+                                             type = "obs",
+                                             begin_date = min_date,
+                                             end_date = max_date) %>%
+      mutate(date = datetime_to_timestamp(date),
+             road_water_level= level-plot_sensor_stats$road_elevation,
+             sensor_water_level=level)
+    w$hide()
+  })
+  
+  observeEvent(c(input$get_plot_data, input$view_alt_3rdparty_data),{
+    req(input$view_3rdparty_data == T,
+        "pred" %in% unlist(isolate(alt_local_wl_metadata())$types),
+        abs(input$dateRange[2] - input$dateRange[1]) <=30,
+        nrow(sensor_data()!=0))
+    
+    min_date = min(input$dateRange)
+    max_date = max(input$dateRange)
+    
+    plot_sensor_stats <- sensor_locations %>% 
+      filter(sensor_ID %in% input$data_sensor)
+    
+    plot_alt_3rd_party_data_predict <<- get_local_wl(wl_id = isolate(alt_local_wl_metadata())$alt_wl_id,
+                                                 wl_src = isolate(alt_local_wl_metadata())$alt_wl_src,
                                                  type = "pred",
                                                  begin_date = min_date %>% str_remove_all("-"),
                                                  end_date = max_date %>% str_remove_all("-")) %>% 
@@ -1619,7 +1706,7 @@ server <- function(input, output, session) {
         hc_title(text =plot_sensor_stats$sensor_label,
                  floating = F)
       
-      if(input$view_3rdparty_data == T){
+      if(input$view_3rdparty_data == T) {
         
         plot_3rd_party_data_stats <- local_wl_metadata()
         
@@ -1638,6 +1725,30 @@ server <- function(input, output, session) {
                                      hcaes(x=date,
                                            y=wl),
                                      name = unique(plot_3rd_party_data_predict$entity),
+                                     type="line",
+                                     color="#01CB4D",
+                                     visible = T)
+        }
+      }
+      if(input$view_alt_3rdparty_data == T) {
+        
+        plot_alt_3rd_party_data_stats <- alt_local_wl_metadata()
+        
+        if("obs" %in% unlist(plot_alt_3rd_party_data_stats$types)) {
+          hc <- hc %>% hc_add_series(plot_alt_3rd_party_data_obs %>% dplyr::select(date,"wl" = ifelse(input$elev_datum == "Road","road_water_level","sensor_water_level")),
+                                     hcaes(x=date,
+                                           y=wl),
+                                     name = unique(plot_alt_3rd_party_data_obs$entity),
+                                     type="line",
+                                     color="#01DC15",
+                                     visible = T)
+        }
+        
+        if("pred" %in% unlist(plot_alt_3rd_party_data_stats$types)){
+          hc <- hc %>% hc_add_series(plot_alt_3rd_party_data_predict %>% dplyr::select(date,"wl" = ifelse(input$elev_datum == "Road","road_water_level","sensor_water_level")),
+                                     hcaes(x=date,
+                                           y=wl),
+                                     name = unique(plot_alt_3rd_party_data_predict$entity),
                                      type="line",
                                      color="#01CB4D",
                                      visible = T)
