@@ -30,7 +30,7 @@ library(tidyverse)
 
 
 # Source env variables if working on desktop
-# source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect.R") 
+source("C:\\Users\\ianiac\\OneDrive - University of North Carolina at Chapel Hill\\Documents\\Sunny Day\\dev\\db_connect_local.R") 
 
 # HTML waiting screen for initial load
 waiting_screen <- tagList(
@@ -181,6 +181,23 @@ fiman_wl <- function(site_id, begin_date, end_date){
   return(wl)
 }
 
+hohonu_wl <- function(site_id, begin_date, end_date){
+  wl <- local_water_levels %>% 
+      filter(id == site_id, date >= begin_date, date <= end_date) %>%
+      select(id, date, value, api_name) %>%
+      arrange(date) %>%
+      transmute(
+        id = id,
+        date = date,
+        level = value,
+        entity = api_name,
+        notes = "observation"
+      ) %>%
+      as_tibble()
+
+  return(wl)
+}
+
 #wl_id, wl_src, wl_types, wl_url
 
 get_local_wl <- function(wl_id, wl_src, type = c("obs"), begin_date, end_date) {
@@ -192,7 +209,10 @@ get_local_wl <- function(wl_id, wl_src, type = c("obs"), begin_date, end_date) {
                           end_date = end_date),
          "FIMAN" = fiman_wl(site_id = wl_id,
                             begin_date = begin_date,
-                            end_date = end_date)
+                            end_date = end_date),
+         "HOHONU" = hohonu_wl(site_id = wl_id,
+                              begin_date = begin_date,
+                              end_date = end_date)
   )
   
 }
