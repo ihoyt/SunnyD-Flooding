@@ -1696,7 +1696,7 @@ server <- function(input, output, session) {
          y_axis_min <- NULL
       }
 
-      nan_threshold <- 0.2
+      nan_threshold <- 1 / 6
       if (input$elev_datum == "Road") {
         x$road_water_level_adj[x$road_water_level_adj < sensor_elevation_limit + nan_threshold & x$road_water_level_adj > sensor_elevation_limit - nan_threshold] <- NaN
         # x <- x %>% filter(road_water_level_adj >= nan_limit)
