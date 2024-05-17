@@ -541,6 +541,7 @@ ui <- bs4Dash::dashboardPage(
                        tabPanel(
                          "Plot",
                          highchartOutput("site_level_ts", width = "100%"),
+                         p("* no water detected beneath sensor elevation line"),
                          hr(),
                          h4("Plot options"),
                          fluidRow(
@@ -849,7 +850,7 @@ server <- function(input, output, session) {
   # Load Data
   # Update sensor locations with most recent data from database
   # Get data from last 90 days only to speed up load time
-  start.date <- Sys.Date() - 90
+  start.date <- Sys.Date() - 2
   tmp <- con %>% 
     tbl("data_for_display") %>%
     filter(date > start.date)
@@ -1462,7 +1463,7 @@ server <- function(input, output, session) {
   
   output$thirdparty_info <- renderUI({
     wl_metadata_collected <- local_wl_metadata()
-    if(!is.na(wl_metadata_collected$wl_url)){
+    if(!is.na(wl_metadata_collected$wl_url) ){
       helpText("  Data source: ",a(href=wl_metadata_collected$wl_url,wl_metadata_collected$wl_src, target = "_blank", class = "pretty-link"))
     }
     
@@ -1472,7 +1473,7 @@ server <- function(input, output, session) {
 
   output$alt_thirdparty_info <- renderUI({
     alt_wl_metadata_collected <- alt_local_wl_metadata()
-    if(!is.na(alt_wl_metadata_collected$alt_wl_url)){
+    if(!is.na(alt_wl_metadata_collected$alt_wl_url) & isolate(alt_local_wl_metadata()$alt_wl_url) != ''){
       helpText("  Data source: ",a(href=alt_wl_metadata_collected$alt_wl_url,alt_wl_metadata_collected$alt_wl_src, target = "_blank", class = "pretty-link"))
     }
   })
@@ -1508,12 +1509,12 @@ server <- function(input, output, session) {
       shinyjs::enable(id = "view_3rdparty_data")
     }
 
-    if(is.na(isolate(alt_local_wl_metadata()$alt_wl_url))){
+    if(is.na(isolate(alt_local_wl_metadata()$alt_wl_url)) | isolate(alt_local_wl_metadata()$alt_wl_url) == ''){
       shinyjs::hide(id = "view_alt_3rdparty_data")
       shinyjs::disable(id = "view_alt_3rdparty_data")
     }
     
-    if(!is.na(isolate(alt_local_wl_metadata()$alt_wl_url))){
+    if(!is.na(isolate(alt_local_wl_metadata()$alt_wl_url)) & isolate(alt_local_wl_metadata()$alt_wl_url) != ''){
       shinyjs::show(id = "view_alt_3rdparty_data")
       shinyjs::enable(id = "view_alt_3rdparty_data")
     }
@@ -1692,6 +1693,8 @@ server <- function(input, output, session) {
         y_axis_min <- ifelse(nrow(x)!=0,
                              c(ifelse(min(x$sensor_water_level_adj, na.rm=T) < reference_elevation_limit, min(x$sensor_water_level_adj, na.rm=T) , reference_elevation_limit - 0.25 )),
                              c(NA)) 
+      } else if (input$view_3rdparty_data == F & input$view_alt_3rdparty_data == F) {
+        y_axis_min <- sensor_elevation_limit - 1
       } else {
          y_axis_min <- NULL
       }
@@ -1704,13 +1707,16 @@ server <- function(input, output, session) {
         x$sensor_water_level_adj[x$sensor_water_level_adj < sensor_elevation_limit + nan_threshold & x$sensor_water_level_adj > sensor_elevation_limit - nan_threshold] <- NaN
         # x <- x %>% filter(sensor_water_level_adj >= nan_limit)
       }
+
+      # nan_bands <- x %>% filter(is.nan(road_water_level_adj))
+      # print(nan_bands)
           
       hc <- highchart() %>%
         hc_add_series(data = x %>% dplyr::select(date,"wl" = ifelse(input$elev_datum == "Road","road_water_level_adj","sensor_water_level_adj")),
                       hcaes(x=date,
                             y = wl),
                       type="line",
-                      name="Water Level (grey dash = no water)",
+                      name="Water Level",
                       color="#1d1d75",
                       # Controls when points are shown on plot (only on zoom)
                       marker = list(
@@ -1796,7 +1802,7 @@ server <- function(input, output, session) {
                         color="black",
                         width = 1,#6
                         zIndex = 1,
-                        label = list(text = "Sensor Elevation",
+                        label = list(text = "Sensor Elevation*",
                                      style = list( color = 'black', fontWeight = 'bold'))))) %>%
         hc_exporting(enabled = TRUE,
                      filename = paste0(plot_sensor_stats$sensor_ID,"_",min_date_plot %>% with_tz("America/New_York"),"_to_",max_date_plot %>% with_tz("America/New_York")),
